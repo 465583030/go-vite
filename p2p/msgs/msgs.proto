@@ -1,0 +1,74 @@
+syntax = "proto3";
+
+package msgs;
+
+message Header {
+    uint32 domain = 1;
+    uint32 version = 2;
+    string command = 3;
+    uint64 payload_length = 4;
+    string checksum = 5;
+}
+
+// messages for discover
+message Node {
+
+}
+
+message Locate {
+    Header header = 1;
+    Node locate = 2;
+}
+
+message Neighbors {
+    Header header = 1;
+    repeated Node nodes = 2;
+}
+
+
+// get snapshot chain headers
+message Ssheaders {
+    Header header = 1;
+    uint64 count = 2;
+    bytes highestHash = 3;
+    bytes stoppingHash = 4;
+}
+
+// get account blockchain headers
+message Accheaders {
+    Header header = 1;
+    bytes account = 2;
+    uint64 count = 3;
+    bytes highestHash = 4;
+    bytes stoppingHash = 5;
+}
+
+// inventory
+message Inv {
+    Header header = 1;
+    uint32 count = 2;
+    uint32 type = 3;
+    repeated bytes hash = 4;
+}
+
+//
+message Getdata {
+    Header header = 1;
+    uint32 type = 2;
+    bytes hash = 3;
+}
+
+// snapshot data
+message Ssblock {
+    Header header = 1;
+}
+
+// transaction data
+message TX {
+    Header header = 1;
+}
+
+// account block data
+message Block {
+    Header header = 1;
+}

@@ -1,18 +1,46 @@
 package p2p
 
-type Locate struct {
-	Target NodeID
-}
+import (
+	"github.com/golang/protobuf/proto"
+	"io"
+)
 
-type Neighbors struct {
-	Nodes []NodeID
-}
-
-type Ssheaders struct {
+type Message struct {
 
 }
 
-type Accheaders struct {
+type Reader interface {
+	Read(*Message) error
+}
 
+type Writer interface {
+	Write(*Message) error
+}
+
+type ReadWriter interface {
+	Reader
+	Writer
+}
+
+
+func Unmarshal(msg proto.Message, originData []byte) error {
+	err := proto.Unmarshal(originData, msg)
+	if err != nil {
+		return err
+	}
+
+	// TODO verify msg.
+	return nil
+}
+
+func Send(pipe io.Writer, msg proto.Message) error {
+	// TODO generate msg checksum.
+
+	data, err := proto.Marshal(msg)
+	if err != nil {
+		return nil
+	}
+	pipe.Write(data)
+	return nil
 }
 

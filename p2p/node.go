@@ -162,6 +162,7 @@ func (b *Bucket) Remove(n *Node) {
 	}
 }
 
+// the neighbors table
 type Table struct {
 	Buckets [NodeIdBits]*Bucket
 	self *Node
