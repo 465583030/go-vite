@@ -27,19 +27,18 @@ type Config struct {
 	// `MaxPeers` is the maximum number of peers that can be connected.
 	MaxPeers uint32
 
-	// `MaxPassivePeers` is the maximum number of peers that initiate an active connection to this node.
-	MaxPassivePeers uint32
+	// `MaxPassivePeersRatio` is the ratio of MaxPeers that initiate an active connection to this node.
+	// the actual value is `MaxPeers / MaxPassivePeersRatio`
+	MaxPassivePeersRatio uint32
 
 	// `MaxPendingPeers` is the maximum number of peers that wait to connect.
 	MaxPendingPeers uint32
 
 	BootNodes []*Node
 
-	// the port server will listen for incoming connections
-	Port uint16
+	listenAddr string
 
-	IP string
-
+	// filepath of database, store former nodes
 	Database string
 }
 
@@ -54,7 +53,7 @@ type Server struct {
 	waitDown sync.WaitGroup
 
 	// TCP listener
-	listener net.Listener
+	listener *net.TCPListener
 
 	createTransport func(conn net.Conn) Transport
 
@@ -101,6 +100,16 @@ func (svr *Server) PeersCount() (amount int) {
 	return
 }
 
+func (svr *Server) MaxActivePeers() uint32 {
+	return svr.MaxPeers - svr.MaxPassivePeers()
+}
+
+func (svr *Server) MaxPassivePeers() uint32 {
+	if svr.MaxPassivePeersRatio == 0 {
+		svr.MaxPassivePeersRatio = 3
+	}
+	return svr.MaxPeers / svr.MaxPassivePeersRatio
+}
 
 func (svr *Server) Start() error {
 	svr.lock.Lock()
@@ -115,7 +124,6 @@ func (svr *Server) Start() error {
 		return errors.New("Server.PrivateKey must set, but get nil.")
 	}
 
-	// channels
 	svr.stopped = make(chan struct{})
 	svr.addPeer = make(chan *Conn)
 	svr.delPeer = make(chan *Peer)
@@ -132,7 +140,7 @@ func (svr *Server) Start() error {
 }
 
 func (svr *Server) Discovery() error {
-	addr, err := net.ResolveUDPAddr("udp", svr.IP + ":" + string(svr.Port))
+	addr, err := net.ResolveUDPAddr("udp", svr.listenAddr)
 	if err != nil {
 		return nil
 	}
@@ -148,13 +156,17 @@ func (svr *Server) Discovery() error {
 }
 
 func (svr *Server) Listen() error {
-	listener, err := net.Listen("tcp", svr.IP + ":" + string(svr.Port))
+	addr, err := net.ResolveTCPAddr("tcp", svr.listenAddr)
 	if err != nil {
 		return err
 	}
 
-	ip := net.ParseIP(svr.IP)
-	if ip.IsLoopback() {
+	listener, err := net.ListenTCP("tcp", addr)
+	if err != nil {
+		return err
+	}
+
+	if addr.IP.IsLoopback() {
 	//	TODO NAT
 	}
 
@@ -203,10 +215,21 @@ func (svr *Server) SetupConn(conn net.Conn, pending chan struct{}) {
 	<- pending
 }
 
+func (svr *Server) CheckConn(peers map[NodeID]*Peer, passivePeersCount uint32, conn *Conn) error {
+	if uint32(len(peers)) >= svr.MaxPeers {
+		return errors.New("to many peers.")
+	}
+	if passivePeersCount >= svr.MaxPassivePeers() {
+		return errors.New("to many passive peers.")
+	}
+	return nil
+}
+
 func (svr *Server) ManageTask() {
 	var dialer Dialer
 	var peers = make(map[NodeID]*Peer)
 	var taskHasDone = make(chan Task, defaultMaxActiveDail)
+	var passivePeersCount uint32 = 0
 	var activeTasks []Task
 	var taskQueue []Task
 	delTask := func(d Task) {
@@ -245,11 +268,16 @@ func (svr *Server) ManageTask() {
 		case t := <- taskHasDone:
 			delTask(t)
 		case c := <- svr.addPeer:
-			p := NewPeer(c)
-			peers[p.ID()] = p
-			go p.Run(svr)
+			err := svr.CheckConn(peers, passivePeersCount, c)
+			if err == nil {
+				p := NewPeer(c)
+				peers[p.ID()] = p
+				go p.Run(svr)
+				passivePeersCount++
+			}
 		case p := <- svr.delPeer:
 			delete(peers, p.ID())
+			passivePeersCount--
 		case fn := <- svr.peersOps:
 			fn(peers)
 			svr.peersOpsDone <- struct{}{}

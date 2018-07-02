@@ -5,21 +5,18 @@ import (
 	"io"
 )
 
-type Message struct {
 
+type MsgReader interface {
+	ReadMsg(*proto.Message) error
 }
 
-type Reader interface {
-	Read(*Message) error
+type MsgWriter interface {
+	WriteMsg(*proto.Message) error
 }
 
-type Writer interface {
-	Write(*Message) error
-}
-
-type ReadWriter interface {
-	Reader
-	Writer
+type MsgReadWriter interface {
+	MsgReader
+	MsgWriter
 }
 
 
@@ -43,4 +40,3 @@ func Send(pipe io.Writer, msg proto.Message) error {
 	pipe.Write(data)
 	return nil
 }
-

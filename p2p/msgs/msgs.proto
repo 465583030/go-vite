@@ -4,10 +4,8 @@ package msgs;
 
 message Header {
     uint32 domain = 1;
-    uint32 version = 2;
-    string command = 3;
-    uint64 payload_length = 4;
-    string checksum = 5;
+    uint32 command = 2;
+    string checksum = 3;
 }
 
 // messages for discover
@@ -17,58 +15,88 @@ message Node {
 
 message Locate {
     Header header = 1;
-    Node locate = 2;
+    LocatePayload payload = 2;
 }
+message LocatePayload {
+    Node locate = 1;
+}
+
 
 message Neighbors {
     Header header = 1;
-    repeated Node nodes = 2;
+    NeighborsPayload payload = 2;
+}
+message NeighborsPayload {
+    repeated Node nodes = 1;
 }
 
 
 // get snapshot chain headers
 message Ssheaders {
     Header header = 1;
-    uint64 count = 2;
-    bytes highestHash = 3;
-    bytes stoppingHash = 4;
+    SsheadersPayload payload = 2;
+}
+message SsheadersPayload {
+    uint64 count = 1;
+    bytes highestHash = 2;
+    bytes stoppingHash = 3;
 }
 
 // get account blockchain headers
 message Accheaders {
     Header header = 1;
-    bytes account = 2;
-    uint64 count = 3;
-    bytes highestHash = 4;
-    bytes stoppingHash = 5;
+    AccheadersPayload payload = 2;
+}
+message AccheadersPayload {
+    bytes account = 1;
+    uint64 count = 2;
+    bytes highestHash = 3;
+    bytes stoppingHash = 4;
 }
 
 // inventory
 message Inv {
     Header header = 1;
-    uint32 count = 2;
-    uint32 type = 3;
-    repeated bytes hash = 4;
+    InvPayload payload = 2;
+}
+message InvPayload {
+    uint32 count = 1;
+    uint32 type = 2;
+    repeated bytes hash = 3;
 }
 
-//
 message Getdata {
     Header header = 1;
-    uint32 type = 2;
-    bytes hash = 3;
+    GetdataPayload payload = 2;
+}
+message GetdataPayload {
+    uint32 type = 1;
+    bytes hash = 2;
 }
 
 // snapshot data
 message Ssblock {
     Header header = 1;
+    SsblockPayload payload = 2;
+}
+message SsblockPayload {
+    // todo
 }
 
 // transaction data
 message TX {
     Header header = 1;
+    TXPayload payload = 2;
+}
+message TXPayload {
+    // todo
 }
 
 // account block data
 message Block {
     Header header = 1;
+    BlockPayload payload = 2;
+}
+message BlockPayload {
+    // todo
 }
