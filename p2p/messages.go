@@ -2,16 +2,19 @@ package p2p
 
 import (
 	"github.com/golang/protobuf/proto"
-	"io"
+	"github.com/vitelabs/go-vite/p2p/msgs"
+	"crypto/sha256"
+	"bytes"
+	"github.com/syndtr/goleveldb/leveldb/errors"
 )
 
 
 type MsgReader interface {
-	ReadMsg(*proto.Message) error
+	ReadMsg(msg *msgs.Msg) error
 }
 
 type MsgWriter interface {
-	WriteMsg(*proto.Message) error
+	WriteMsg(msg *msgs.Msg) error
 }
 
 type MsgReadWriter interface {
@@ -21,22 +24,43 @@ type MsgReadWriter interface {
 
 
 func Unmarshal(msg proto.Message, originData []byte) error {
-	err := proto.Unmarshal(originData, msg)
+	var message *msgs.Msg
+	err := proto.Unmarshal(originData, message)
 	if err != nil {
 		return err
 	}
 
-	// TODO verify msg.
-	return nil
+	checksum := message.Header.Checksum
+	payload := message.Payload
+	hash := sha256.Sum256(payload)
+
+	if bytes.Compare(checksum, hash[:5]) != 0 {
+		return errors.New("invalid payload.")
+	}
+
+	err = proto.Unmarshal(payload, msg)
+
+	return err
 }
 
-func Send(pipe io.Writer, msg proto.Message) error {
-	// TODO generate msg checksum.
 
-	data, err := proto.Marshal(msg)
+func Send(pipe MsgWriter, command uint32, payload proto.Message) error {
+	data, err := proto.Marshal(payload)
 	if err != nil {
 		return nil
 	}
-	pipe.Write(data)
+
+	hash := sha256.Sum256(data)
+	checksum := hash[:5]
+	msg := &msgs.Msg{
+		Header: &msgs.Header{
+			Domain: 1,
+			Command: command,
+			Checksum: checksum,
+		},
+		Payload: data,
+	}
+
+	pipe.WriteMsg(msg)
 	return nil
 }

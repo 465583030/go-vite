@@ -5,38 +5,30 @@ package msgs;
 message Header {
     uint32 domain = 1;
     uint32 command = 2;
-    string checksum = 3;
+    bytes checksum = 3;
 }
 
 // messages for discover
+message Msg {
+    Header header = 1;
+    bytes payload = 2;
+}
+
 message Node {
 
 }
 
 message Locate {
-    Header header = 1;
-    LocatePayload payload = 2;
-}
-message LocatePayload {
     Node locate = 1;
 }
 
-
 message Neighbors {
-    Header header = 1;
-    NeighborsPayload payload = 2;
-}
-message NeighborsPayload {
     repeated Node nodes = 1;
 }
 
 
 // get snapshot chain headers
 message Ssheaders {
-    Header header = 1;
-    SsheadersPayload payload = 2;
-}
-message SsheadersPayload {
     uint64 count = 1;
     bytes highestHash = 2;
     bytes stoppingHash = 3;
@@ -44,10 +36,6 @@ message SsheadersPayload {
 
 // get account blockchain headers
 message Accheaders {
-    Header header = 1;
-    AccheadersPayload payload = 2;
-}
-message AccheadersPayload {
     bytes account = 1;
     uint64 count = 2;
     bytes highestHash = 3;
@@ -56,47 +44,28 @@ message AccheadersPayload {
 
 // inventory
 message Inv {
-    Header header = 1;
-    InvPayload payload = 2;
-}
-message InvPayload {
     uint32 count = 1;
     uint32 type = 2;
     repeated bytes hash = 3;
 }
 
+
 message Getdata {
-    Header header = 1;
-    GetdataPayload payload = 2;
-}
-message GetdataPayload {
     uint32 type = 1;
     bytes hash = 2;
 }
 
 // snapshot data
 message Ssblock {
-    Header header = 1;
-    SsblockPayload payload = 2;
-}
-message SsblockPayload {
     // todo
 }
 
 // transaction data
 message TX {
-    Header header = 1;
-    TXPayload payload = 2;
-}
-message TXPayload {
     // todo
 }
 
 // account block data
 message Block {
-    Header header = 1;
-    BlockPayload payload = 2;
-}
-message BlockPayload {
     // todo
 }
