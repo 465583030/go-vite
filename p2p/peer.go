@@ -4,19 +4,25 @@ import (
 	"net"
 	"time"
 	"sync"
+	"github.com/vitelabs/go-vite/p2p/msgs"
 )
 
 var pingInterval = 15 * time.Second
 
 // mean a transport, can write/read/close
 type Transport interface {
-	ReadWriter
+	MsgReadWriter
 	Close() error
 }
 
 type Conn struct {
+	flag ConnFlag
 	netconn net.Conn
 	Transport
+}
+
+func (c *Conn) is(flag ConnFlag) bool {
+	return c.flag.is(flag)
 }
 
 type Peer struct {
@@ -53,6 +59,16 @@ func (p *Peer) Run(svr *Server) {
 	go p.readLoop(rError)
 	go p.pingLoop()
 
+	loop:
+	for {
+		select {
+			case <- canWrite:
+
+		}
+	}
+
+	close(p.closed)
+	p.conn.Close()
 	p.waitDown.Wait()
 	svr.delPeer <- p
 }
@@ -61,18 +77,18 @@ func (p *Peer) ID() NodeID {
 
 }
 
-func (p *Peer) readLoop(cerr chan<- error) {
+func (p *Peer) readLoop(cherr chan<- error) {
 	defer p.waitDown.Done()
 
 	for {
-		msg, err := p.conn.Read()
+		msg, err := p.conn.ReadMsg()
 		if err != nil {
-			cerr <- err
+			cherr <- err
 			return
 		}
 		err = p.handleMsg(msg)
 		if err != nil {
-			cerr <- err
+			cherr <- err
 			return
 		}
 	}
@@ -87,7 +103,7 @@ func (p *Peer) pingLoop() {
 	for {
 		select {
 		case <- ticker.C:
-			if err := Send(p.conn, pingMsg); err != nil {
+			if err := Send(p.conn, 1, &msgs.Ping{}); err != nil {
 				p.protocolErr <- err
 				return
 			}
@@ -97,9 +113,12 @@ func (p *Peer) pingLoop() {
 	}
 }
 
-func (p *Peer) handleMsg(msg Message) error {
-	switch msg.code {
-
+func (p *Peer) handleMsg(msg msgs.Msg) error {
+	switch msg.Header.Command {
+	case pingMsg:
+		Send(p.conn, 2, &msgs.Pong{})
+	case pongMsg:
+// todo handle other messages
 	}
 	return nil
 }

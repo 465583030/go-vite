@@ -52,6 +52,8 @@ type Server struct {
 	// Wait for shutdown clean jobs done.
 	waitDown sync.WaitGroup
 
+	Dialer *NodeDailer
+
 	// TCP listener
 	listener *net.TCPListener
 
@@ -122,6 +124,14 @@ func (svr *Server) Start() error {
 
 	if svr.PrivateKey == nil {
 		return errors.New("Server.PrivateKey must set, but get nil.")
+	}
+
+	if svr.Dialer == nil {
+		svr.Dialer = &NodeDailer{
+			&net.Dialer{
+				Timeout: defaultDialTimeout,
+			},
+		}
 	}
 
 	svr.stopped = make(chan struct{})
@@ -205,6 +215,13 @@ func (svr *Server) handleConn() {
 	}
 }
 
+func (svr *Server) SetupActiveConn(conn net.Conn, flag ConnFlag, dest *Node) error {
+
+}
+func (svr *Server) SetupPassiveConn(conn net.Conn, flag ConnFlag) error {
+
+}
+
 func (svr *Server) SetupConn(conn net.Conn, pending chan struct{}) {
 	c := &Conn{
 		netconn: conn,
@@ -226,7 +243,7 @@ func (svr *Server) CheckConn(peers map[NodeID]*Peer, passivePeersCount uint32, c
 }
 
 func (svr *Server) ManageTask() {
-	var dialer Dialer
+	var dialer DialManager
 	var peers = make(map[NodeID]*Peer)
 	var taskHasDone = make(chan Task, defaultMaxActiveDail)
 	var passivePeersCount uint32 = 0
@@ -285,7 +302,7 @@ func (svr *Server) ManageTask() {
 	}
 
 	for _, p := range peers {
-		p.Disconnect()
+		p.Disconnect(DiscQuitting)
 	}
 
 	// wait for peers work down.

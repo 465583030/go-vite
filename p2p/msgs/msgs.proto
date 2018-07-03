@@ -15,7 +15,15 @@ message Msg {
 }
 
 message Node {
+    // todo
+}
 
+message Ping {
+    // todo
+}
+
+message Pong {
+    // todo
 }
 
 message Locate {

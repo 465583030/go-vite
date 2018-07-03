@@ -5,12 +5,16 @@ import (
 	"github.com/vitelabs/go-vite/p2p/msgs"
 	"crypto/sha256"
 	"bytes"
-	"github.com/syndtr/goleveldb/leveldb/errors"
+	"errors"
 )
 
+const (
+	pingMsg = iota + 1
+	pongMsg
+)
 
 type MsgReader interface {
-	ReadMsg(msg *msgs.Msg) error
+	ReadMsg() (msgs.Msg, error)
 }
 
 type MsgWriter interface {
