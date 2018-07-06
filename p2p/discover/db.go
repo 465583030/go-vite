@@ -9,6 +9,9 @@ import (
 	"bytes"
 	"os"
 	"github.com/syndtr/goleveldb/leveldb/util"
+	"time"
+	"crypto/rand"
+	"github.com/syndtr/goleveldb/leveldb/iterator"
 )
 
 type NodeDB struct {
@@ -25,6 +28,11 @@ const (
 	dbPing = dbDiscover + ":ping"
 	dbPong = dbDiscover + ":pong"
 	dbFindFail = dbDiscover + ":fail"
+)
+
+var (
+	dbCleanInterval = time.Hour
+	dbNodeLifetime = 24 * time.Hour
 )
 
 func newDB(path string, version int, id NodeID) (*NodeDB, error) {
@@ -132,20 +140,28 @@ func (db *NodeDB) retrieveNode(ID NodeID) *Node {
 	if err != nil {
 		return nil
 	}
+
 	node := new(Node)
-	//todo decode []byte to Node
+	err = node.Deserialize(data)
+	if err != nil {
+		return nil
+	}
 	return node
 }
 
 func (db *NodeDB) updateNode(node *Node) error {
 	key := genKey(node.ID, dbDiscover)
-	// todo encode Node to []byte
-	var data []byte
+	data, err := node.Serialize()
+	if err != nil {
+		return err
+	}
 	return db.db.Put(key, data, nil)
 }
-
+// remove all data about the specific NodeID
 func (db *NodeDB) deleteNode(ID NodeID) error {
 	iterator := db.db.NewIterator(util.BytesPrefix(genKey(ID, "")), nil)
+	defer iterator.Release()
+
 	for iterator.Next() {
 		err := db.db.Delete(iterator.Key(), nil)
 		if err != nil {
@@ -155,7 +171,110 @@ func (db *NodeDB) deleteNode(ID NodeID) error {
 	return nil
 }
 
+func (db *NodeDB) cleanStaleNodes() error {
+	threshold := time.Now().Add(-dbNodeLifetime)
+	it := db.db.NewIterator(nil, nil)
+	defer it.Release()
+
+	for it.Next() {
+		id, field := parseKey(it.Key())
+		if field != dbDiscover || bytes.Equal(id[:], db.ID[:]) {
+			continue
+		}
+		
+		connectTime := db.connectTime(id)
+		if connectTime.After(threshold) {
+			continue
+		}
+		db.deleteNode(id)
+	}
+
+	return nil
+}
+
+func (db *NodeDB) cleanRegularly() {
+	ticker := time.NewTicker(dbCleanInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <- ticker.C:
+			db.cleanStaleNodes()
+		case <- db.closed:
+			return
+		}
+	}
+}
+
+func (db *NodeDB) randomNodes(length int, duration time.Duration) []*Node {
+	iterator := db.db.NewIterator(nil, nil)
+	defer iterator.Release()
+
+	nodes := make([]*Node, 0, length)
+	maxRounds := length * 5
+
+	id := NodeID{}
+	var node *Node
+
+	for i := 0; len(nodes) < length && i < maxRounds; i++ {
+		h := id[0]
+		rand.Read(id[:])
+		id[0] = h + id[0] % 16
+		node = netxNode(iterator)
+		if contains(nodes, node) {
+			continue
+		}
+		nodes = append(nodes, node)
+	}
+
+	return nodes
+}
+
+func (db *NodeDB) connectTime(id NodeID) time.Time {
+	key := genKey(id, dbPong)
+	return time.Unix(db.retrieveInt64(key), 0)
+}
+
+func (db *NodeDB) initClean() {
+	db.init.Do(func() {
+		go db.cleanRegularly()
+	})
+}
+
 func (db *NodeDB) close() {
 	db.db.Close()
 	close(db.closed)
+}
+
+// helper functions
+func contains(nodes []*Node, node *Node) bool {
+	for _, n := range nodes {
+		if n.ID == node.ID {
+			return true
+		}
+	}
+	return false
+}
+
+func netxNode(iterator iterator.Iterator) (node *Node) {
+	var field string
+	var data []byte
+	var err error
+
+	for iterator.Next() {
+		_, field = parseKey(iterator.Key())
+
+		if field != dbDiscover {
+			continue
+		}
+
+		data = iterator.Value()
+		err = node.Deserialize(data)
+
+		if err != nil {
+			continue
+		}
+	}
+
+	return node
 }

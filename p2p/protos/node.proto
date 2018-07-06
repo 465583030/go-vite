@@ -1,0 +1,11 @@
+syntax="proto3";
+
+package protos;
+
+message Node {
+    string IP = 1;
+    uint32 UDP = 2;
+    uint32 TCP = 3;
+    bytes Hash = 4;
+    uint64 time = 5;
+}
