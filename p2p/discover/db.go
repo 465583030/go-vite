@@ -22,6 +22,7 @@ type NodeDB struct {
 }
 
 const (
+	dbCurrentVersion = 1
 	dbVersion = "version"
 	dbPrefix = "n:"
 	dbDiscover = "discover"
@@ -206,17 +207,17 @@ func (db *NodeDB) cleanRegularly() {
 	}
 }
 
-func (db *NodeDB) randomNodes(length int, duration time.Duration) []*Node {
+func (db *NodeDB) randomNodes(count int, duration time.Duration) []*Node {
 	iterator := db.db.NewIterator(nil, nil)
 	defer iterator.Release()
 
-	nodes := make([]*Node, 0, length)
-	maxRounds := length * 5
+	nodes := make([]*Node, 0, count)
+	maxRounds := count * 5
 
 	id := NodeID{}
 	var node *Node
 
-	for i := 0; len(nodes) < length && i < maxRounds; i++ {
+	for i := 0; len(nodes) < count && i < maxRounds; i++ {
 		h := id[0]
 		rand.Read(id[:])
 		id[0] = h + id[0] % 16
@@ -239,6 +240,14 @@ func (db *NodeDB) initClean() {
 	db.init.Do(func() {
 		go db.cleanRegularly()
 	})
+}
+
+func (db *NodeDB) findFails(id NodeID) int {
+	return int(db.retrieveInt64(genKey(id, dbFindFail)))
+}
+
+func (db *NodeDB) updateFindFails(id NodeID, fails int) error {
+	return db.storeInt64(genKey(id, dbFindFail), int64(fails))
 }
 
 func (db *NodeDB) close() {
